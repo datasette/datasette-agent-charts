@@ -15,7 +15,21 @@ datasette install datasette-agent-charts
 ```
 ## Usage
 
-Usage instructions go here.
+This plugin adds a `render_chart` tool to [Datasette Agent](https://github.com/datasette/datasette-agent) that can generate charts from SQL query results using [Observable Plot](https://observablehq.com/plot/).
+
+The tool accepts the following parameters:
+
+- **database** — the database to query
+- **sql** — SQL query whose results become chart data
+- **chart_type** — one of `barX`, `barY`, `line`, `dot`, `areaY`, `waffleY`
+- **x** — column name for the x axis
+- **y** — column name for the y axis
+- **color** — (optional) column name for color encoding
+- **title** — (optional) chart title
+- **x_label** — (optional) x axis label
+- **y_label** — (optional) y axis label
+
+The agent will use this tool automatically when asked to visualize data.
 
 ## Development
 
