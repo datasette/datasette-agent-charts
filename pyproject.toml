@@ -1,0 +1,42 @@
+[project]
+name = "datasette-agent-charts"
+version = "0.1"
+description = "Observable Plot charts for Datasette Agent"
+readme = "README.md"
+authors = [{name = "Simon Willison"}]
+license = "Apache-2.0"
+classifiers=[
+    "Framework :: Datasette"
+]
+requires-python = ">=3.10"
+dependencies = [
+    "datasette",
+    # "datasette-agent",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-asyncio"
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+
+[project.urls]
+Homepage = "https://github.com/datasette/datasette-agent-charts"
+Changelog = "https://github.com/datasette/datasette-agent-charts/releases"
+Issues = "https://github.com/datasette/datasette-agent-charts/issues"
+CI = "https://github.com/datasette/datasette-agent-charts/actions"
+
+[project.entry-points.datasette]
+agent_charts = "datasette_agent_charts"
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.setuptools.package-data]
+datasette_agent_charts = ["static/*"]
