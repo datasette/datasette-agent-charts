@@ -1,9 +1,10 @@
+const PLOT_MODULE_URL =
+  "https://esm.sh/@observablehq/plot@0.6.17/es2022/plot.bundle.mjs";
+
 let plotPromise = null;
 function loadPlot() {
   if (!plotPromise) {
-    plotPromise = import(
-      "https://cdn.jsdelivr.net/npm/@observablehq/plot@0.6/+esm"
-    );
+    plotPromise = import(PLOT_MODULE_URL);
   }
   return plotPromise;
 }
