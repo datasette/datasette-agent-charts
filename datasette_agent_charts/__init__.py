@@ -27,9 +27,38 @@ def _build_html(config):
 
 
 async def _render_chart(
-    datasette, actor, database, sql, chart_type, x, y,
-    color=None, title=None, x_label=None, y_label=None,
+    datasette,
+    actor,
+    database,
+    sql,
+    chart_type,
+    x,
+    y,
+    color=None,
+    title=None,
+    x_label=None,
+    y_label=None,
 ):
+    # Validate that configured columns exist in SQL results
+    db = datasette.get_database(database)
+    check_sql = f"with q as ({sql}) select * from q limit 0"
+    result = await db.execute(check_sql)
+    columns = set(result.columns)
+    expected = {"x": x, "y": y}
+    if color:
+        expected["color"] = color
+    missing = {k: v for k, v in expected.items() if v not in columns}
+    if missing:
+        details = ", ".join(f"{k} column '{v}' not found" for k, v in missing.items())
+        return json.dumps(
+            {
+                "error": (
+                    f"Column mismatch: {details}. "
+                    f"SQL query returns columns: {sorted(columns)}"
+                ),
+            }
+        )
+
     config = {
         "type": chart_type,
         "database": database,
@@ -46,12 +75,14 @@ async def _render_chart(
     if y_label:
         config["yLabel"] = y_label
 
-    return json.dumps({
-        "_html": _build_html(config),
-        "chart_type": chart_type,
-        "database": database,
-        "sql": sql,
-    })
+    return json.dumps(
+        {
+            "_html": _build_html(config),
+            "chart_type": chart_type,
+            "database": database,
+            "sql": sql,
+        }
+    )
 
 
 @hookimpl
