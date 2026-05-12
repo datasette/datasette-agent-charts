@@ -5,7 +5,7 @@
 [![Tests](https://github.com/datasette/datasette-agent-charts/actions/workflows/test.yml/badge.svg)](https://github.com/datasette/datasette-agent-charts/actions/workflows/test.yml)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/datasette/datasette-agent-charts/blob/main/LICENSE)
 
-Observable Plot charts for Datasette Agent
+Observable Plot charts for [Datasette agent](https://github.com/datasette/datasette-agent).
 
 ## Installation
 
@@ -17,7 +17,13 @@ datasette install datasette-agent-charts
 
 This plugin adds a `render_chart` tool to [Datasette Agent](https://github.com/datasette/datasette-agent) that can generate charts from SQL query results using [Observable Plot](https://observablehq.com/plot/).
 
-The tool accepts the following parameters:
+Try prompts like this one, adapted to your available tables:
+
+> `Draw a bar chart of downloads over time`
+
+## Tool definition
+
+The `render_chart` tool accepts the following parameters:
 
 - **database** — the database to query
 - **sql** — SQL query whose results become chart data
@@ -28,8 +34,6 @@ The tool accepts the following parameters:
 - **title** — (optional) chart title
 - **x_label** — (optional) x axis label
 - **y_label** — (optional) y axis label
-
-The agent will use this tool automatically when asked to visualize data.
 
 ## Development
 
