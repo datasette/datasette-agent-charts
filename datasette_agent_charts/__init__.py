@@ -42,7 +42,10 @@ async def _render_chart(
     # Validate that configured columns exist in SQL results
     db = datasette.get_database(database)
     check_sql = f"with q as ({sql}) select * from q limit 0"
-    result = await db.execute(check_sql)
+    try:
+        result = await db.execute(check_sql)
+    except Exception as e:
+        return json.dumps({"error": f"SQL error: {e}"})
     columns = set(result.columns)
     expected = {"x": x, "y": y}
     if color:

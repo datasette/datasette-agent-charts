@@ -167,6 +167,40 @@ def datasette_db(tmp_path):
     return Datasette([str(db_path)])
 
 
+@pytest.mark.asyncio
+async def test_render_chart_invalid_sql_returns_error(datasette_db):
+    """A SQL error should come back as a friendly error, not an exception."""
+    result = await _render_chart(
+        datasette=datasette_db,
+        actor=None,
+        database="mydb",
+        sql="select name, count from no_such_table",
+        chart_type="barY",
+        x="name",
+        y="count",
+    )
+    data = json.loads(result)
+    assert "_html" not in data
+    assert "no_such_table" in data["error"]
+
+
+@pytest.mark.asyncio
+async def test_render_chart_syntax_error_returns_error(datasette_db):
+    """Malformed SQL should also come back as a friendly error."""
+    result = await _render_chart(
+        datasette=datasette_db,
+        actor=None,
+        database="mydb",
+        sql="select name, count from t;",
+        chart_type="barY",
+        x="name",
+        y="count",
+    )
+    data = json.loads(result)
+    assert "_html" not in data
+    assert "error" in data
+
+
 @pytest.fixture
 def datasette_with_trees(tmp_path):
     import sqlite3
