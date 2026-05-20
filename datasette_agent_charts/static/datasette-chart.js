@@ -100,19 +100,30 @@ class DatasetteChart extends HTMLElement {
     // tip: true adds an interactive tooltip showing each point's channel values
     const markOptions = { x, y, tip: true };
 
-    // Color encoding: fill for bar/area, stroke for line/dot
+    // For bar/waffle charts the value column is shaded when no color is given
+    const valueColumn = { barX: x, barY: y, waffleY: y };
+
+    let colorScheme = null;
     if (color) {
+      // Explicit color column: stroke for line/dot marks, fill for the rest
       if (type === "line" || type === "dot") {
         markOptions.stroke = color;
       } else {
         markOptions.fill = color;
       }
-    } else {
-      if (type === "line" || type === "dot") {
-        markOptions.stroke = "#1e3a5f";
-      } else {
-        markOptions.fill = "#1e3a5f";
+      // Text-valued color columns read best with a categorical scheme
+      const sample = data.find((row) => row[color] != null);
+      if (sample && typeof sample[color] === "string") {
+        colorScheme = "observable10";
       }
+    } else if (valueColumn[type]) {
+      // No color column: shade each bar by its own magnitude
+      markOptions.fill = valueColumn[type];
+      colorScheme = "blues";
+    } else if (type === "line" || type === "dot") {
+      markOptions.stroke = "#1e3a5f";
+    } else {
+      markOptions.fill = "#1e3a5f";
     }
 
     const marks = [];
@@ -144,6 +155,7 @@ class DatasetteChart extends HTMLElement {
     }
 
     const plotOptions = { marks };
+    if (colorScheme) plotOptions.color = { scheme: colorScheme };
     if (xLabel) plotOptions.x = { label: xLabel };
     if (yLabel) plotOptions.y = { label: yLabel };
     if (title) plotOptions.title = title;
