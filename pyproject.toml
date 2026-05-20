@@ -1,6 +1,6 @@
 [project]
 name = "datasette-agent-charts"
-version = "0.1a0"
+version = "0.1a1"
 description = "Observable Plot charts for Datasette Agent"
 readme = "README.md"
 authors = [{name = "Simon Willison"}]
