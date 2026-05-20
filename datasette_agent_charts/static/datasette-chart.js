@@ -95,7 +95,7 @@ class DatasetteChart extends HTMLElement {
   }
 
   buildChart(Plot, config, data) {
-    const { type, x, y, color, title, width, height, xLabel, yLabel } = config;
+    const { type, x, y, color, title, xLabel, yLabel } = config;
 
     const markOptions = { x, y };
 
@@ -143,8 +143,6 @@ class DatasetteChart extends HTMLElement {
     }
 
     const plotOptions = { marks };
-    if (width) plotOptions.width = width;
-    if (height) plotOptions.height = height;
     if (xLabel) plotOptions.x = { label: xLabel };
     if (yLabel) plotOptions.y = { label: yLabel };
     if (title) plotOptions.title = title;
