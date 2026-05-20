@@ -9,6 +9,7 @@ from datasette_agent_charts import (
     CHART_TYPE_SCHEMA,
     _build_html,
     _render_chart,
+    register_agent_tools,
 )
 
 
@@ -32,6 +33,15 @@ def test_chart_type_schema():
         "areaY",
         "waffleY",
     }
+
+
+def test_tool_description_lists_all_chart_types(datasette_db):
+    tools = register_agent_tools(datasette_db)
+    render_chart = next(t for t in tools if t.name == "render_chart")
+    for chart_type in CHART_TYPES:
+        assert chart_type in render_chart.description, (
+            f"{chart_type} missing from render_chart tool description"
+        )
 
 
 def test_build_html():

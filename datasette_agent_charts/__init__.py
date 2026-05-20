@@ -96,7 +96,7 @@ def register_agent_tools(datasette):
                 "Render a chart by executing a SQL query and visualizing the results. "
                 "The SQL should return rows with columns matching the x and y parameters. "
                 "Supported chart types: barX (horizontal bars), barY (vertical bars), line, dot (scatter plot), "
-                "areaY (filled area)."
+                "areaY (filled area), waffleY (waffle/part-of-whole)."
             ),
             input_schema={
                 "type": "object",
