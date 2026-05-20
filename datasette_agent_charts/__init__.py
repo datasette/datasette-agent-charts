@@ -1,6 +1,7 @@
 import json
 
 from datasette import hookimpl
+from datasette.resources import DatabaseResource
 
 CHART_SCRIPT_TAG = (
     '<script src="/-/static-plugins/datasette-agent-charts/datasette-chart.js"'
@@ -39,6 +40,21 @@ async def _render_chart(
     x_label=None,
     y_label=None,
 ):
+    # The tool runs arbitrary SQL, so require the actor's execute-sql permission
+    if not await datasette.allowed(
+        action="execute-sql",
+        resource=DatabaseResource(database=database),
+        actor=actor,
+    ):
+        return json.dumps(
+            {
+                "error": (
+                    f"Permission denied: you do not have permission to "
+                    f"execute SQL against the '{database}' database."
+                )
+            }
+        )
+
     # Validate that configured columns exist in SQL results
     db = datasette.get_database(database)
     check_sql = f"with q as ({sql}) select * from q limit 0"

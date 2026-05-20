@@ -2,6 +2,7 @@ import json
 
 from datasette.app import Datasette
 import pytest
+import pytest_asyncio
 
 from datasette_agent_charts import (
     CHART_SCRIPT_TAG,
@@ -35,7 +36,8 @@ def test_chart_type_schema():
     }
 
 
-def test_tool_description_lists_all_chart_types(datasette_db):
+@pytest.mark.asyncio
+async def test_tool_description_lists_all_chart_types(datasette_db):
     tools = register_agent_tools(datasette_db)
     render_chart = next(t for t in tools if t.name == "render_chart")
     for chart_type in CHART_TYPES:
@@ -153,8 +155,8 @@ async def test_render_chart_html_contains_script_and_element(datasette_db):
     assert "</datasette-chart>" in data["_html"]
 
 
-@pytest.fixture
-def datasette_db(tmp_path):
+@pytest_asyncio.fixture
+async def datasette_db(tmp_path):
     import sqlite3
 
     db_path = tmp_path / "mydb.db"
@@ -164,7 +166,44 @@ def datasette_db(tmp_path):
     )
     conn.execute("insert into t values ('foo', 1, 1.0, 2.0, 'red', 10, 20)")
     conn.close()
-    return Datasette([str(db_path)])
+    datasette = Datasette([str(db_path)])
+    await datasette.invoke_startup()
+    return datasette
+
+
+@pytest_asyncio.fixture
+async def datasette_no_execute_sql(tmp_path):
+    import sqlite3
+
+    db_path = tmp_path / "mydb.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("create table t (name text, count integer)")
+    conn.execute("insert into t values ('foo', 1)")
+    conn.close()
+    datasette = Datasette(
+        [str(db_path)], config={"databases": {"mydb": {"allow_sql": False}}}
+    )
+    await datasette.invoke_startup()
+    return datasette
+
+
+@pytest.mark.asyncio
+async def test_render_chart_denied_without_execute_sql_permission(
+    datasette_no_execute_sql,
+):
+    """Without execute-sql permission the tool must refuse to run the query."""
+    result = await _render_chart(
+        datasette=datasette_no_execute_sql,
+        actor=None,
+        database="mydb",
+        sql="select name, count from t",
+        chart_type="barY",
+        x="name",
+        y="count",
+    )
+    data = json.loads(result)
+    assert "_html" not in data
+    assert "permission" in data["error"].lower()
 
 
 @pytest.mark.asyncio
@@ -201,8 +240,8 @@ async def test_render_chart_syntax_error_returns_error(datasette_db):
     assert "error" in data
 
 
-@pytest.fixture
-def datasette_with_trees(tmp_path):
+@pytest_asyncio.fixture
+async def datasette_with_trees(tmp_path):
     import sqlite3
 
     db_path = tmp_path / "trees.db"
@@ -210,7 +249,9 @@ def datasette_with_trees(tmp_path):
     conn.execute("create table trees (Latitude real, Longitude real, Species text)")
     conn.execute("insert into trees values (37.75, -122.4, 'Oak')")
     conn.close()
-    return Datasette([str(db_path)])
+    datasette = Datasette([str(db_path)])
+    await datasette.invoke_startup()
+    return datasette
 
 
 @pytest.mark.asyncio
