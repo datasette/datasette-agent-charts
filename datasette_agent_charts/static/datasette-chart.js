@@ -97,7 +97,8 @@ class DatasetteChart extends HTMLElement {
   buildChart(Plot, config, data) {
     const { type, x, y, color, title, xLabel, yLabel } = config;
 
-    const markOptions = { x, y };
+    // tip: true adds an interactive tooltip showing each point's channel values
+    const markOptions = { x, y, tip: true };
 
     // Color encoding: fill for bar/area, stroke for line/dot
     if (color) {
