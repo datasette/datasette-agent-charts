@@ -103,6 +103,7 @@ async def test_render_chart_minimal(datasette_db):
         "type": "barY",
         "database": "mydb",
         "sql": "select name, count from t",
+        "queryUrl": datasette_db.urls.database("mydb") + "/-/query",
         "x": "name",
         "y": "count",
     }

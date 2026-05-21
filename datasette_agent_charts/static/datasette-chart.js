@@ -9,6 +9,24 @@ function loadPlot() {
   return plotPromise;
 }
 
+function sqlQueryUrl(queryUrl, sql) {
+  const url = new URL(queryUrl, window.location.href);
+  url.searchParams.set("sql", sql);
+  return url.href;
+}
+
+function createSqlEditLink(queryUrl, sql) {
+  const editLink = document.createElement("p");
+  editLink.className = "agent-sql-edit-link";
+  const link = document.createElement("a");
+  link.href = sqlQueryUrl(queryUrl, sql);
+  link.target = "_blank";
+  link.rel = "noopener";
+  link.textContent = "View SQL query";
+  editLink.appendChild(link);
+  return editLink;
+}
+
 class DatasetteChart extends HTMLElement {
   async connectedCallback() {
     // Grab the config script before modifying DOM, since textContent wipes children
@@ -34,7 +52,7 @@ class DatasetteChart extends HTMLElement {
       return;
     }
 
-    const { database, sql } = config;
+    const { database, sql, queryUrl } = config;
     if (!database || !sql) {
       this.textContent = "Error: database and sql are required";
       return;
@@ -81,16 +99,9 @@ class DatasetteChart extends HTMLElement {
       this.appendChild(chart);
     }
 
-    // Show the SQL query in a collapsible details element
-    if (sql) {
-      const details = document.createElement("details");
-      const summary = document.createElement("summary");
-      summary.textContent = "SQL query";
-      details.appendChild(summary);
-      const pre = document.createElement("pre");
-      pre.textContent = sql;
-      details.appendChild(pre);
-      this.appendChild(details);
+    // Match the Datasette Agent SQL action shown below table results.
+    if (queryUrl && sql) {
+      this.appendChild(createSqlEditLink(queryUrl, sql));
     }
   }
 
