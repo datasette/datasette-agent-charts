@@ -8,6 +8,7 @@ from datasette_agent_charts import (
     CHART_SCRIPT_TAG,
     CHART_TYPES,
     CHART_TYPE_SCHEMA,
+    DATE_INTERVALS,
     _build_html,
     _render_chart,
     register_agent_tools,
@@ -36,14 +37,25 @@ def test_chart_type_schema():
     }
 
 
+def test_date_options_in_tool_schema():
+    render_chart = register_agent_tools(None)[0]
+    properties = render_chart.input_schema["properties"]
+    assert properties["x_date_format"]["type"] == "string"
+    assert properties["y_date_format"]["type"] == "string"
+    assert properties["x_date_interval"]["enum"] == DATE_INTERVALS
+    assert properties["y_date_interval"]["enum"] == DATE_INTERVALS
+    assert properties["x_date_tick_every"]["minimum"] == 1
+    assert properties["y_date_tick_every"]["minimum"] == 1
+
+
 @pytest.mark.asyncio
 async def test_tool_description_lists_all_chart_types(datasette_db):
     tools = register_agent_tools(datasette_db)
     render_chart = next(t for t in tools if t.name == "render_chart")
     for chart_type in CHART_TYPES:
-        assert chart_type in render_chart.description, (
-            f"{chart_type} missing from render_chart tool description"
-        )
+        assert (
+            chart_type in render_chart.description
+        ), f"{chart_type} missing from render_chart tool description"
 
 
 def test_build_html():
@@ -137,6 +149,74 @@ async def test_render_chart_all_options(datasette_db):
     assert embedded_config["title"] == "My Chart"
     assert embedded_config["xLabel"] == "X Axis"
     assert embedded_config["yLabel"] == "Y Axis"
+
+
+@pytest.mark.asyncio
+async def test_render_chart_date_axis_options(datasette_db):
+    result = await _render_chart(
+        datasette=datasette_db,
+        actor=None,
+        database="mydb",
+        sql="select '202001' as month, count from t",
+        chart_type="barY",
+        x="month",
+        y="count",
+        x_date_format="%Y%m",
+        x_date_interval="month",
+        x_date_tick_format="%Y-%m",
+        x_date_tick_every=3,
+    )
+    data = json.loads(result)
+    assert "_html" in data
+
+    html = data["_html"]
+    start = html.index('<script type="application/json">') + len(
+        '<script type="application/json">'
+    )
+    end = html.index("</script>", start)
+    embedded_config = json.loads(html[start:end])
+    assert embedded_config["xDateFormat"] == "%Y%m"
+    assert embedded_config["xDateInterval"] == "month"
+    assert embedded_config["xDateTickFormat"] == "%Y-%m"
+    assert embedded_config["xDateTickEvery"] == 3
+
+
+@pytest.mark.asyncio
+async def test_render_chart_rejects_invalid_date_interval(datasette_db):
+    result = await _render_chart(
+        datasette=datasette_db,
+        actor=None,
+        database="mydb",
+        sql="select '202001' as month, count from t",
+        chart_type="barY",
+        x="month",
+        y="count",
+        x_date_format="%Y%m",
+        x_date_interval="quarter",
+    )
+    data = json.loads(result)
+    assert "_html" not in data
+    assert data["error"] == (
+        "x_date_interval must be one of: "
+        "millisecond, second, minute, hour, day, week, month, year"
+    )
+
+
+@pytest.mark.asyncio
+async def test_render_chart_rejects_tick_options_without_date_format(datasette_db):
+    result = await _render_chart(
+        datasette=datasette_db,
+        actor=None,
+        database="mydb",
+        sql="select name, count from t",
+        chart_type="barY",
+        x="name",
+        y="count",
+        x_date_tick_every=3,
+    )
+    data = json.loads(result)
+    assert "_html" not in data
+    assert data["error"] == "x_date_format is required for x date axis options"
 
 
 @pytest.mark.asyncio

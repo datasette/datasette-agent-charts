@@ -34,6 +34,28 @@ The `render_chart` tool accepts the following parameters:
 - **title** — (optional) chart title
 - **x_label** — (optional) x axis label
 - **y_label** — (optional) y axis label
+- **x_date_format** — (optional) parse the x column as a UTC date using a `d3.utcParse` pattern, for example `%Y%m` or `%Y-%m`
+- **y_date_format** — (optional) parse the y column as a UTC date
+- **x_date_interval** — (optional) date interval for parsed x-axis bars and ticks: `millisecond`, `second`, `minute`, `hour`, `day`, `week`, `month`, or `year`
+- **y_date_interval** — (optional) date interval for parsed y-axis bars and ticks
+- **x_date_tick_format** — (optional) format parsed x-axis tick labels using a `d3.utcFormat` pattern, for example `%Y-%m`
+- **y_date_tick_format** — (optional) format parsed y-axis tick labels
+- **x_date_tick_every** — (optional) show parsed x-axis ticks every N date intervals
+- **y_date_tick_every** — (optional) show parsed y-axis ticks every N date intervals
+
+For example, if a SQL query returns monthly values as `202401`, use:
+
+```json
+{
+  "chart_type": "barY",
+  "x": "month",
+  "y": "count",
+  "x_date_format": "%Y%m",
+  "x_date_interval": "month",
+  "x_date_tick_format": "%Y-%m",
+  "x_date_tick_every": 3
+}
+```
 
 ## Development
 

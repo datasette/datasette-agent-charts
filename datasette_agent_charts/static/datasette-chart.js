@@ -1,5 +1,9 @@
 const PLOT_MODULE_URL =
   "https://esm.sh/@observablehq/plot@0.6.17/es2022/plot.bundle.mjs";
+const D3_TIME_FORMAT_MODULE_URL =
+  "https://esm.sh/d3-time-format@4.1.0/es2022/d3-time-format.bundle.mjs";
+const D3_TIME_MODULE_URL =
+  "https://esm.sh/d3-time@3.1.0/es2022/d3-time.bundle.mjs";
 
 let plotPromise = null;
 function loadPlot() {
@@ -7,6 +11,160 @@ function loadPlot() {
     plotPromise = import(PLOT_MODULE_URL);
   }
   return plotPromise;
+}
+
+let d3TimePromise = null;
+function loadD3Time() {
+  if (!d3TimePromise) {
+    d3TimePromise = Promise.all([
+      import(D3_TIME_FORMAT_MODULE_URL),
+      import(D3_TIME_MODULE_URL),
+    ]).then(([timeFormat, time]) => ({ ...timeFormat, ...time }));
+  }
+  return d3TimePromise;
+}
+
+const UTC_INTERVALS = {
+  millisecond: "utcMillisecond",
+  second: "utcSecond",
+  minute: "utcMinute",
+  hour: "utcHour",
+  day: "utcDay",
+  week: "utcWeek",
+  month: "utcMonth",
+  year: "utcYear",
+};
+
+function hasDateAxis(config) {
+  return Boolean(config.xDateFormat || config.yDateFormat);
+}
+
+function patternHasAny(format, directives) {
+  return directives.some((directive) => format.includes(directive));
+}
+
+function inferDateInterval(format) {
+  if (patternHasAny(format, ["%L", "%f"])) return "millisecond";
+  if (patternHasAny(format, ["%S"])) return "second";
+  if (patternHasAny(format, ["%M"])) return "minute";
+  if (patternHasAny(format, ["%H", "%I", "%p"])) return "hour";
+  if (patternHasAny(format, ["%d", "%e", "%j"])) return "day";
+  if (patternHasAny(format, ["%U", "%W", "%V"])) return "week";
+  if (patternHasAny(format, ["%m", "%b", "%B"])) return "month";
+  if (patternHasAny(format, ["%Y", "%y"])) return "year";
+  return null;
+}
+
+function defaultTickFormat(interval) {
+  switch (interval) {
+    case "year":
+      return "%Y";
+    case "month":
+      return "%Y-%m";
+    case "week":
+    case "day":
+      return "%Y-%m-%d";
+    case "hour":
+    case "minute":
+      return "%Y-%m-%d %H:%M";
+    case "second":
+      return "%H:%M:%S";
+    case "millisecond":
+      return "%H:%M:%S.%L";
+    default:
+      return null;
+  }
+}
+
+function utcInterval(d3, interval) {
+  const name = UTC_INTERVALS[interval];
+  return name ? d3[name] : null;
+}
+
+function uniqueColumnName(base, used) {
+  let name = base;
+  let suffix = 2;
+  while (used.has(name)) {
+    name = `${base}_${suffix}`;
+    suffix += 1;
+  }
+  used.add(name);
+  return name;
+}
+
+function applyDateAxes(data, config, d3) {
+  if (!d3 || !hasDateAxis(config)) {
+    return { data, axes: {} };
+  }
+
+  const usedColumns = new Set(Object.keys(data[0] || {}));
+  const axes = {};
+
+  for (const axis of ["x", "y"]) {
+    const format = config[`${axis}DateFormat`];
+    if (!format) continue;
+
+    const column = config[axis];
+    const parser = d3.utcParse(format);
+    const parsedColumn = uniqueColumnName(`_${column}_${axis}_date`, usedColumns);
+    axes[axis] = {
+      column,
+      format,
+      parser,
+      parsedColumn,
+      interval: config[`${axis}DateInterval`] || inferDateInterval(format),
+      tickFormat: config[`${axis}DateTickFormat`],
+      tickEvery: config[`${axis}DateTickEvery`],
+    };
+  }
+
+  if (!Object.keys(axes).length) {
+    return { data, axes };
+  }
+
+  const parsedData = data.map((row) => {
+    const next = { ...row };
+    for (const axis of Object.keys(axes)) {
+      const dateAxis = axes[axis];
+      const value = row[dateAxis.column];
+      next[dateAxis.parsedColumn] =
+        value == null || value === ""
+          ? null
+          : value instanceof Date
+            ? value
+            : dateAxis.parser(String(value));
+    }
+    return next;
+  });
+
+  return { data: parsedData, axes };
+}
+
+function axisOptions(label, dateAxis, d3) {
+  const options = {};
+  if (label) {
+    options.label = label;
+  } else if (dateAxis) {
+    options.label = dateAxis.column;
+  }
+
+  if (dateAxis && d3) {
+    const interval = dateAxis.interval;
+    const tickEvery = Number(dateAxis.tickEvery);
+    if (interval && Number.isInteger(tickEvery) && tickEvery > 0) {
+      const intervalFunction = utcInterval(d3, interval);
+      if (intervalFunction && intervalFunction.every) {
+        options.ticks = intervalFunction.every(tickEvery);
+      }
+    }
+
+    const tickFormat = dateAxis.tickFormat || defaultTickFormat(interval);
+    if (tickFormat) {
+      options.tickFormat = d3.utcFormat(tickFormat);
+    }
+  }
+
+  return Object.keys(options).length ? options : null;
 }
 
 function sqlQueryUrl(queryUrl, sql) {
@@ -78,9 +236,12 @@ class DatasetteChart extends HTMLElement {
       return;
     }
 
-    const Plot = await loadPlot();
+    const [Plot, d3] = await Promise.all([
+      loadPlot(),
+      hasDateAxis(config) ? loadD3Time() : Promise.resolve(null),
+    ]);
     this.textContent = "";
-    const chart = this.buildChart(Plot, config, data);
+    const chart = this.buildChart(Plot, d3, config, data);
     if (chart) {
       // Show Observable Plot warnings as visible text
       (() => {
@@ -105,11 +266,16 @@ class DatasetteChart extends HTMLElement {
     }
   }
 
-  buildChart(Plot, config, data) {
+  buildChart(Plot, d3, config, data) {
     const { type, x, y, color, title, xLabel, yLabel } = config;
+    const { data: plotData, axes } = applyDateAxes(data, config, d3);
 
     // tip: true adds an interactive tooltip showing each point's channel values
-    const markOptions = { x, y, tip: true };
+    const markOptions = {
+      x: axes.x ? axes.x.parsedColumn : x,
+      y: axes.y ? axes.y.parsedColumn : y,
+      tip: true,
+    };
 
     // For bar/waffle charts the value column is shaded when no color is given
     const valueColumn = { barX: x, barY: y, waffleY: y };
@@ -123,7 +289,7 @@ class DatasetteChart extends HTMLElement {
         markOptions.fill = color;
       }
       // Text-valued color columns read best with a categorical scheme
-      const sample = data.find((row) => row[color] != null);
+      const sample = plotData.find((row) => row[color] != null);
       if (sample && typeof sample[color] === "string") {
         colorScheme = "observable10";
       }
@@ -140,25 +306,45 @@ class DatasetteChart extends HTMLElement {
     const marks = [];
     switch (type) {
       case "barX":
-        marks.push(Plot.barX(data, markOptions));
+        if (axes.y && axes.y.interval) {
+          marks.push(
+            Plot.rectX(plotData, {
+              ...markOptions,
+              interval: axes.y.interval,
+              inset: 0.5,
+            }),
+          );
+        } else {
+          marks.push(Plot.barX(plotData, markOptions));
+        }
         marks.push(Plot.ruleX([0]));
         break;
       case "barY":
-        marks.push(Plot.barY(data, markOptions));
+        if (axes.x && axes.x.interval) {
+          marks.push(
+            Plot.rectY(plotData, {
+              ...markOptions,
+              interval: axes.x.interval,
+              inset: 0.5,
+            }),
+          );
+        } else {
+          marks.push(Plot.barY(plotData, markOptions));
+        }
         marks.push(Plot.ruleY([0]));
         break;
       case "line":
-        marks.push(Plot.line(data, markOptions));
+        marks.push(Plot.line(plotData, markOptions));
         break;
       case "dot":
-        marks.push(Plot.dot(data, markOptions));
+        marks.push(Plot.dot(plotData, markOptions));
         break;
       case "areaY":
-        marks.push(Plot.areaY(data, markOptions));
+        marks.push(Plot.areaY(plotData, markOptions));
         marks.push(Plot.ruleY([0]));
         break;
       case "waffleY":
-        marks.push(Plot.waffleY(data, markOptions));
+        marks.push(Plot.waffleY(plotData, markOptions));
         break;
       default:
         this.textContent = "Unknown chart type: " + type;
@@ -167,8 +353,11 @@ class DatasetteChart extends HTMLElement {
 
     const plotOptions = { marks };
     if (colorScheme) plotOptions.color = { scheme: colorScheme };
-    if (xLabel) plotOptions.x = { label: xLabel };
-    if (yLabel) plotOptions.y = { label: yLabel };
+    const xOptions = axisOptions(xLabel, axes.x, d3);
+    const yOptions = axisOptions(yLabel, axes.y, d3);
+    if (xOptions) plotOptions.x = xOptions;
+    if (yOptions) plotOptions.y = yOptions;
+    if (axes.x) plotOptions.marginBottom = 45;
     if (title) plotOptions.title = title;
 
     return Plot.plot(plotOptions);
