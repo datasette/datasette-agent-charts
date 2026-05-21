@@ -82,6 +82,7 @@ async def _render_chart(
         "type": chart_type,
         "database": database,
         "sql": sql,
+        "queryUrl": datasette.urls.database(database) + "/-/query",
         "x": x,
         "y": y,
     }
