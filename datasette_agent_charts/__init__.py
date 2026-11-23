@@ -62,7 +62,7 @@ async def _render_chart(
         result = await db.execute(check_sql)
     except Exception as e:
         return json.dumps({"error": f"SQL error: {e}"})
-    columns = set(result.columns)
+    columns = set(result.columns.names)
     expected = {"x": x, "y": y}
     if color:
         expected["color"] = color
